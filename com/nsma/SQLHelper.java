@@ -45,7 +45,7 @@ public class SQLHelper implements AutoCloseable {
     }
 
     /**
-     * connect to the data base with provided DB Path.<br><br>
+     * connect to the data base with provided DB Path<br><br>
      * <br> this method must be called before any operation on database
      * <br> If connection is already opened it will be closed and new one will
      * be created.
