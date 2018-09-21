@@ -57,7 +57,6 @@ public class SQLHelper implements AutoCloseable {
      * <br> 3- could not find driver (library).
      * <br> 4- Error while trying to connect with the database.
      *
-     * @return true if connection was sucsussful.
      */
     public void open() throws SQLException {
         if (getDBPath().trim().isEmpty()) {
@@ -89,7 +88,6 @@ public class SQLHelper implements AutoCloseable {
      * @param username database username
      * @param password database password
      *
-     * @return true if connection was sucsussful.
      */
     public void open(String username, String password) throws SQLException {
         if (getDBPath().trim().isEmpty()) {
@@ -158,7 +156,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public void commit_Transaction() throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't commit transaction connection is closed");
+            throw new SQLHelperExeption("can't commit transaction Must Call open() before that, connection is closed");
         }
         if (connection.getAutoCommit()) {
             throw new SQLHelperExeption("can't commit transaction must call begin_Transaction() before commit_Transaction()");
@@ -199,7 +197,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public void begin_Transaction() throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't begin transaction connection is closed");
+            throw new SQLHelperExeption("can't begin transaction Must Call open() before that, connection is closed");
         }
         if (!connection.getAutoCommit()) {
             throw new SQLHelperExeption("can't begin transaction, transaction already begun");
@@ -241,7 +239,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public void rollBack_Transaction() throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't rollback transaction connection is closed");
+            throw new SQLHelperExeption("can't rollback transaction Must Call open() before that, connection is closed");
         }
         if (connection.getAutoCommit()) {
             throw new SQLHelperExeption("can't rollback transaction must call begin_Transaction() before rollBack_Transaction()");
@@ -257,7 +255,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public boolean isAutoCommit() throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't check isAutoCommit connection is closed");
+            throw new SQLHelperExeption("can't check isAutoCommit Must Call open() before that, connection is closed");
         }
         return connection.getAutoCommit();
     }
@@ -290,7 +288,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public void dropTableIfExists(String tableName) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't drop table connection is closed");
+            throw new SQLHelperExeption("can't drop table Must Call open() before that, connection is closed");
         }
         if (tableName == null || tableName.trim().isEmpty()) {
             throw new SQLHelperExeption("table name can't be empty or null");
@@ -313,7 +311,7 @@ public class SQLHelper implements AutoCloseable {
     public void dropIndexIfExists(String indexName) throws SQLException {
 
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't create drop unique index connection is closed");
+            throw new SQLHelperExeption("can't create drop unique index Must Call open() before that, connection is closed");
         }
         if (indexName == null || indexName.trim().isEmpty()) {
             throw new SQLHelperExeption("index can't be empty or null");
@@ -351,7 +349,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public void createIndexIfNotExists(String tableName, String columnName, String indexName, boolean isUnique) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't create new unique index connection is closed");
+            throw new SQLHelperExeption("can't create new unique index Must Call open() before that, connection is closed");
         }
         if (tableName == null || tableName.trim().isEmpty() || columnName == null || columnName.trim().isEmpty() || indexName == null || indexName.trim().isEmpty()) {
             throw new SQLHelperExeption("table name or column or index can't be empty or null");
@@ -391,7 +389,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public void createNewTableIfNotExists(String tableName, String columnsNamesWithTypes) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't create new table connection is closed");
+            throw new SQLHelperExeption("can't create new table Must Call open() before that, connection is closed");
         }
         if (tableName == null || tableName.trim().isEmpty() || columnsNamesWithTypes == null || columnsNamesWithTypes.trim().isEmpty()) {
             throw new SQLHelperExeption("table name or columns can't be empty or null");
@@ -407,7 +405,7 @@ public class SQLHelper implements AutoCloseable {
 
     public void createNewVirtualTableIfNotExists(String tableName, String columnsNamesWithoutType) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't create new virtual table connection is closed");
+            throw new SQLHelperExeption("can't create new virtual table Must Call open() before that, connection is closed");
         }
         if (tableName == null || tableName.trim().isEmpty() || columnsNamesWithoutType == null || columnsNamesWithoutType.trim().isEmpty()) {
             throw new SQLHelperExeption("table name or columns can't be empty or null");
@@ -424,7 +422,7 @@ public class SQLHelper implements AutoCloseable {
 
     public void createNewVirtualTableIfNotExists(String tableName, String columnsNamesWithoutType, String module) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't create new virtual table connection is closed");
+            throw new SQLHelperExeption("can't create new virtual table Must Call open() before that, connection is closed");
         }
         if (tableName == null || tableName.trim().isEmpty() || columnsNamesWithoutType == null || columnsNamesWithoutType.trim().isEmpty() || module == null || module.trim().isEmpty()) {
             throw new SQLHelperExeption("table name or columns or module can't be empty or null");
@@ -497,7 +495,7 @@ public class SQLHelper implements AutoCloseable {
     public int count(String tableName, String columnName, String whereCondition, Object... values) throws SQLException {
         if (connection == null || connection.isClosed()) {
             //System.err.println("[" + Thread.currentThread().getStackTrace()[1].getClassName() + " Error] -> " + Thread.currentThread().getStackTrace()[2] + " " + "can't count connection is closed");
-            throw new SQLHelperExeption("can't count connection is closed");
+            throw new SQLHelperExeption("Must Call open() before count(), connection is closed");
         }
 
         if (tableName == null || tableName.trim().isEmpty() || columnName == null || columnName.trim().isEmpty()) {
@@ -554,7 +552,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public double min(String tableName, String columnName, int round) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't get min connection is closed");
+            throw new SQLHelperExeption("Must Call open() before min(), connection is closed");
         }
 
         if (tableName == null || tableName.trim().isEmpty() || columnName == null || columnName.trim().isEmpty()) {
@@ -587,7 +585,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public double max(String tableName, String columnName, int round) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't get max connection is closed");
+            throw new SQLHelperExeption("Must Call open() before max(), connection is closed");
         }
 
         if (tableName == null || tableName.trim().isEmpty() || columnName == null || columnName.trim().isEmpty()) {
@@ -619,7 +617,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public double sum(String tableName, String columnName, int round) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't get sum connection is closed");
+            throw new SQLHelperExeption("Must Call open() before sum(), connection is closed");
         }
 
         if (tableName == null || tableName.trim().isEmpty() || columnName == null || columnName.trim().isEmpty()) {
@@ -652,7 +650,7 @@ public class SQLHelper implements AutoCloseable {
     public double avg(String tableName, String columnName, int round) throws SQLException {
 
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't get avg connection is closed");
+            throw new SQLHelperExeption("Must Call open() before avg(), connection is closed");
         }
 
         if (tableName == null || tableName.trim().isEmpty() || columnName == null || columnName.trim().isEmpty()) {
@@ -685,7 +683,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public boolean isExists(String tableName, String columnsNames, String whereCondition, Object... values) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't check if exists connection is closed");
+            throw new SQLHelperExeption("Must Call open() Before isExists(), connection is closed");
         }
 
         if (tableName == null || tableName.trim().isEmpty() || columnsNames == null || columnsNames.trim().isEmpty()) {
@@ -720,7 +718,7 @@ public class SQLHelper implements AutoCloseable {
 
     public ResultSet select(String tableName, String columnsNames, String whereCondition, Object... values) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't select connection is closed");
+            throw new SQLHelperExeption("Must Call open() before select(), connection is closed");
         }
         if (tableName == null || tableName.trim().isEmpty() || columnsNames == null || columnsNames.trim().isEmpty()) {
             throw new SQLHelperExeption("table name or columns can't be empty or null");
@@ -759,7 +757,7 @@ public class SQLHelper implements AutoCloseable {
      */
     public int insert(String tableName, String columnsNames, Object... values) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't insert connection is closed");
+            throw new SQLHelperExeption("Must Call open() before insert(), connection is closed");
         }
         if (tableName == null || tableName.trim().isEmpty() || columnsNames == null || columnsNames.trim().isEmpty()) {
             throw new SQLHelperExeption("table name or columns can't be empty or null");
@@ -850,7 +848,7 @@ public class SQLHelper implements AutoCloseable {
 
     public int update(String tableName, String columnsNames, String whereCondition, Object... values) throws SQLException {
         if (connection == null || connection.isClosed()) {
-            throw new SQLHelperExeption("can't update connection is closed");
+            throw new SQLHelperExeption("Must Call open() before update(), connection is closed");
         }
         if (tableName == null || tableName.trim().isEmpty() || columnsNames == null || columnsNames.trim().isEmpty()) {
             throw new SQLHelperExeption("table name or columns or condition can't be empty or null");
@@ -884,7 +882,7 @@ public class SQLHelper implements AutoCloseable {
     public PreparedStatement prepareStatement(String SQLstatement) {
         try {
             if (connection == null || connection.isClosed()) {
-                System.err.println("[" + Thread.currentThread().getStackTrace()[1].getClassName() + " Error] -> " + Thread.currentThread().getStackTrace()[2] + " " + "can't preparestatement connection is closed");
+                System.err.println("[" + Thread.currentThread().getStackTrace()[1].getClassName() + " Error] -> " + Thread.currentThread().getStackTrace()[2] + " " + "can't preparestatement Must Call open() before that, connection is closed");
                 return null;
             }
             return connection.prepareStatement(SQLstatement);
