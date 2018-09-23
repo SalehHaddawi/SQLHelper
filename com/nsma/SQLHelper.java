@@ -6,6 +6,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Properties;
 
 /**
  *
@@ -96,10 +97,36 @@ public class SQLHelper implements AutoCloseable {
 
         close();
 
-        connection = null;
+        connection = null;//Properties properties
 
         // create a connection to the database
         connection = DriverManager.getConnection(DB_URL, username, password);
+        System.out.println("Connection to [" + DB_URL + "] has been started.");
+    }
+    
+    /**
+     * connect to the data base with provided DB Path and username and
+     * password<br>if the database support username and password
+     * <br> this method must be called before any operation on database
+     * <br> If connection is already opened it will be closed and new one will
+     * be created.<br><br><b>****************** Warnings ******************</b>
+    <br> if any of this Errors happend it will not connect and it will be
+ displayed in the output:<br>
+    <br> 1- DB path is empty or null.<br> 2- DB path is invalid.<br> 3- could not find driver (library).<br> 4- Error while trying to connect with the database.
+     *
+     * @param properties connection properties
+     */
+    public void open(Properties properties) throws SQLException {
+        if (getDBPath().trim().isEmpty()) {
+            throw new SQLHelperExeption("can't connect to database location is not specified");
+        }
+
+        close();
+
+        connection = null;
+
+        // create a connection to the database
+        connection = DriverManager.getConnection(DB_URL,properties);
         System.out.println("Connection to [" + DB_URL + "] has been started.");
     }
 
