@@ -13,7 +13,7 @@ import java.util.Properties;
  * @author Saleh Haddawi
  */
 /**
- * SQLHelper is designed to make quick in easy access to database to perform
+ * SQLHelper is designed to make quick and easy access to database to perform
  * simple operations.
  *
  * @author Saleh Haddawi
