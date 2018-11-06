@@ -1,4 +1,4 @@
-# # # SQLHelper
+# SQLHelper
 java class to manage access and operations on database.
 
 This class needs a JDBC driver.
@@ -11,4 +11,19 @@ try(SQLHelper sql = new SQLHelper("jdbc:sqlite:my database.db")){
 } catch(Exception e){
 
 }
+```
+ **SQLHelper have three `constructor`:**
+ - databse url only:
+ ```
+new SQLHelper("jdbc:sqlite:my database.db")
+```
+
+- databse url and username and password:
+ ```
+new SQLHelper("jdbc:sqlite:my database.db","username","password")
+```
+
+- databse url and connection `properties`:
+ ```
+new SQLHelper("jdbc:sqlite:my database.db",properties)
 ```
