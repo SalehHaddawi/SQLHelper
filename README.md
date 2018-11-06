@@ -12,7 +12,8 @@ try(SQLHelper sql = new SQLHelper("jdbc:sqlite:my database.db")){
 
 }
 ```
- **SQLHelper have three `constructor`:**
+ **SQLHelper have three `constructors`:**
+ 
  - databse url only:
  ```
 new SQLHelper("jdbc:sqlite:my database.db")
