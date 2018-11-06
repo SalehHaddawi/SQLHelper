@@ -99,7 +99,7 @@ here are the steps to make it work:
 
 Example Item class:
 ```
-public class item {
+public class item implements SQLHelperValue {
     int id;
     String name;
     double price;
