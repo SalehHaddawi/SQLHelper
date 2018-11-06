@@ -47,7 +47,7 @@ The class is devided into 5 parts:
 
 
 ## Databse Operations.
-include `insert` , `update` , `delete` and `select` operations.
+include [insert](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#insert) , [update](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#update) , [delete](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#delete) and [select](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#select) operations.
 
 accessing Databse Operations using `op()` method from SQLHelper object:
 ```
