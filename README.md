@@ -21,10 +21,15 @@ new SQLHelper("jdbc:sqlite:my database.db")
 
 - databse url and username and password:
  ```
-new SQLHelper("jdbc:sqlite:my database.db","username","password")
+new SQLHelper("jdbc:oracle:thin:@localhost:1521:xe","username","password")
 ```
 
 - databse url and connection `properties`:
  ```
-new SQLHelper("jdbc:sqlite:my database.db",properties)
+Properties properties = new Properties();
+properties.setProperty("user", "USERNAME");
+properties.setProperty("password", "PASSWORD");
+properties.setProperty("serverTimezone", "UTC");
+
+new SQLHelper("jdbc:mysql://127.0.0.1:3306/testing",properties)
 ```
