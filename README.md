@@ -39,10 +39,10 @@ new SQLHelper("jdbc:mysql://127.0.0.1:3306/testing",properties)
 The class is devided into 5 parts:
 
 - [Databse Operations](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#databse-operations).
-- Key Value Table Manager.
-- Databse Table Manager.
-- Databse Connection Manager.
-- Databse Transaction Manager.
+- [Key Value Table Manager](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#key-value-table-manager).
+- [Databse Table Manager](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#databse-table-manager).
+- [Databse Connection Manager]((https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#database-connection-manager)).
+- [Databse Transaction Manager]((https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#database-transaction-manager)).
 
 
 
