@@ -1,4 +1,4 @@
-### SQLHelper
+# # # SQLHelper
 java class to manage access and operations on database.
 
 This class needs a JDBC driver.
