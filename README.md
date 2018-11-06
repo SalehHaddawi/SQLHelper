@@ -40,7 +40,7 @@ The class is devided into 5 parts:
 
 - [Databse Operations](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#databse-operations).
 - Key Value Table Manager.
-- Databse Table Manager
+- Databse Table Manager.
 - Databse Connection Manager.
 - Databse Transaction Manager.
 
@@ -135,3 +135,23 @@ now you can use Item object in `setValues()` method.
 **Notes:**
 - using multiable ways to set values will reset the other ways.
 - if columns are not specified then, SQLHelper will get all columns from databse, **and they will be in the same order as in databse.**
+
+### Update:
+
+
+### Delete:
+
+
+### Select:
+
+
+## Key Value Table Manager.
+
+
+## Databse Table Manager.
+
+
+## Databse Connection Manager.
+
+
+## Databse Transaction Manager.
