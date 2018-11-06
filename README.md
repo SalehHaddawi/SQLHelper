@@ -38,7 +38,7 @@ new SQLHelper("jdbc:mysql://127.0.0.1:3306/testing",properties)
 
 The class is devided into 5 parts:
 
-- Databse Operations.
+- [Databse Operations](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#databse-operations).
 - Key Value Table Manager.
 - Databse Table Manager
 - Databse Connection Manager.
@@ -59,6 +59,8 @@ try(SQLHelper sql = new SQLHelper(... databse url ...)){
 ```
 
 in the following part we will assume a table `items` with 3 columns : `id INT, name VARCHAR(45), price REAL`
+
+### Insert:
 
 to `insert` into database you need to get refrence to SQLHelperInsertStatment from `op()` method and provide the table name that you want to insert to, like follows:
 
