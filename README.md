@@ -41,8 +41,8 @@ The class is devided into 5 parts:
 - [Databse Operations](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#databse-operations).
 - [Key Value Table Manager](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#key-value-table-manager).
 - [Databse Table Manager](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#databse-table-manager).
-- [Databse Connection Manager]((https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#database-connection-manager)).
-- [Databse Transaction Manager]((https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#database-transaction-manager)).
+- [Databse Connection Manager](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#database-connection-manager).
+- [Databse Transaction Manager](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#database-transaction-manager).
 
 
 
