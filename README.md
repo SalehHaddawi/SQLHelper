@@ -157,7 +157,7 @@ to `update` to database you need to get refrence to SQLHelperUpdateStatment from
 
 - `setCols(String columns)`: specify the columns you wish to update can be all columns or some, example: `setCols("id,name,price")`
 - `setValues(Object... values)`: specify values for the columns in `setCols()` method in the same order, example: `setValues(10235,"toy",10.25)`
-- `setValues(SQLHelperValue object)`: another way to specify values for the columns in `setCols()` method, as discussed in [insert](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#insert) part.
+- `setValues(SQLHelperValue object)`: another way to specify values for the columns in `setCols()` method, as discussed in [Preparing class to be used with SQLHelper](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#preparing-class-to-be-used-with-sqlhelper) part.
 - `setCol(String column,Object value)`: specify a column and it's value, example: `setCol("price",10.25)`
 - `setCondition(String condition,Object... values)`: condition to limit updating to specific record using SQL `WHERE` keyword, if no condition is specified all records will be updated, the sympol `?` is used instead of values in the condition, after the condition, you specify each value for `?` in condition seperated by comma, example: `setCondition("WHERE id = ?",1023)`.
 - `reset()`: reset all values and columns for all methods in `SQLHelperUpdateStatment` instance.
