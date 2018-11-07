@@ -1,5 +1,5 @@
 # SQLHelper
-java class to manage access and operations on database.
+## java class to manage access and operations on database.
 
 SQLHelper requires a basic knowledge in SQL and in java `PreparedStatment` and `ResultSet`.
 
