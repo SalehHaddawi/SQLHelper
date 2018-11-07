@@ -134,7 +134,20 @@ now you can use Item object in `setValues()` method.
 
 **Notes:**
 - using multiable ways to set values will reset the other ways.
-- if columns are not specified then, SQLHelper will get all columns from databse, **and they will be in the same order as in databse.**
+- if columns are not specified, then SQLHelper will get all columns from databse, **and they will be in the same order as in databse.**
+- when doing multiable insert into single table consider saving a refrence to `SQLHelperInsertStatment` object instead of creating new one for each insert, consider the follwing example:
+```
+sql.op().insert("items").setCols("id,name,price").setValues(1023,"toy1",10.25).execute();
+sql.op().insert("items").setCols("id,name,price").setValues(1024,"toy2",15.25).execute();
+sql.op().insert("items").setCols("id,name,price").setValues(1025,"toy3",18.25).execute();
+```
+should be converted to:
+```
+SQLHelperInsertStatment insert = sql.op().insert("items");
+insert.setCols("id,name,price").setValues(1023,"toy1",10.25).execute();
+insert.setCols("id,name,price").setValues(1024,"toy2",15.25).execute();
+insert.setCols("id,name,price").setValues(1025,"toy3",18.25).execute();
+```
 
 ### Update:
 
