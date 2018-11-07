@@ -537,7 +537,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public int execute() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             int res = 0;
@@ -677,7 +677,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public int execute() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             int res = 0;
@@ -749,7 +749,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public long executeLarge() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             long res = 0;
@@ -852,7 +852,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public int execute() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             int res = 0;
@@ -885,7 +885,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public long executeLarge() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             long res = 0;
@@ -1004,7 +1004,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public double max(String column) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
             if (column == null) {
                 throw new NullPointerException("column is null in SQL MAX.");
@@ -1050,7 +1050,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public double min(String column) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
             if (column == null) {
                 throw new NullPointerException("column is null in SQL MIN.");
@@ -1097,7 +1097,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public double sum(String column) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
             if (column == null) {
                 throw new NullPointerException("column is null in SQL SUM.");
@@ -1144,7 +1144,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public double avg(String column) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
             if (column == null) {
                 throw new NullPointerException("column is null in SQL AVG.");
@@ -1192,7 +1192,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public long count(String column) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
             if (column == null) {
                 throw new NullPointerException("column is null in SQL COUNT.");
@@ -1236,7 +1236,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public ResultSet execute() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             StringBuilder sql = new StringBuilder(50);
@@ -1277,7 +1277,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public <T extends SQLHelperValue> List<T> execute(Class<T> returnListType) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             StringBuilder sql = new StringBuilder(50);
@@ -1348,7 +1348,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public void dropTable(String table) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             try (PreparedStatement ps = connection.prepareStatement("DROP TABLE " + table)) {
@@ -1359,7 +1359,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public void dropTableIfExists(String table) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             if (isTableExists(table)) {
@@ -1370,7 +1370,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public void createTable(String table, String columnsNamesWithType) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             StringBuilder sqlS = new StringBuilder(50);
@@ -1384,7 +1384,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public void createTableIfNotExists(String table, String columnsNamesWithType) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             if (!isTableExists(table)) {
@@ -1395,11 +1395,10 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public boolean isTableExists(String table) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            try {
-                connection.prepareStatement("SELECT 1 FROM " + table).executeQuery();
+            try (PreparedStatement ps = connection.prepareStatement("SELECT 1 FROM " + table)) {
                 return true;
             } catch (Throwable e) {
                 return false;
@@ -1418,7 +1417,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public void begin() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             connection.setAutoCommit(false);
@@ -1428,7 +1427,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public void commit() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             connection.commit();
@@ -1438,9 +1437,9 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public void rollback() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             connection.rollback();
             connection.setAutoCommit(true);
         }
@@ -1448,27 +1447,27 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public boolean isAutoCommit() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             return connection.getAutoCommit();
         }
 
         @Override
         public Savepoint createSavePoint() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             return connection.setSavepoint();
         }
 
         @Override
         public void rollback(Savepoint savepoint) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             connection.rollback(savepoint);
         }
 
@@ -1491,10 +1490,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public void put(String key, Object value) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
-            }
-            if (!isTableExists(keyValueTableName, connection)) {
-                connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))").executeUpdate();
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             if (key == null) {
@@ -1502,16 +1498,27 @@ public class SQLHelper implements AutoCloseable {
             }
 
             int NUM_ROWS_EFFECTED;
-            try (PreparedStatement ps = connection.prepareStatement("UPDATE " + keyValueTableName + " SET sqlhelper_value = ? WHERE sqlhelper_key = ?")) {
-                setValuesForPreparedStatment(ps, value, 1);
-                ps.setString(2, key);
-                NUM_ROWS_EFFECTED = ps.executeUpdate();
-            }
-            if (NUM_ROWS_EFFECTED == 0) {
-                try (PreparedStatement ps = connection.prepareStatement("INSERT INTO " + keyValueTableName + " (sqlhelper_key,sqlhelper_value) VALUES (?,?) ")) {
-                    ps.setString(1, key);
-                    setValuesForPreparedStatment(ps, value, 2);
-                    ps.executeUpdate();
+
+            try {
+                try (PreparedStatement ps = connection.prepareStatement("UPDATE " + keyValueTableName + " SET sqlhelper_value = ? WHERE sqlhelper_key = ?")) {
+                    setValuesForPreparedStatment(ps, value, 1);
+                    ps.setString(2, key);
+                    NUM_ROWS_EFFECTED = ps.executeUpdate();
+                }
+                if (NUM_ROWS_EFFECTED == 0) {
+                    try (PreparedStatement ps = connection.prepareStatement("INSERT INTO " + keyValueTableName + " (sqlhelper_key,sqlhelper_value) VALUES (?,?) ")) {
+                        ps.setString(1, key);
+                        setValuesForPreparedStatment(ps, value, 2);
+                        ps.executeUpdate();
+                    }
+                }
+            } catch (SQLException e) {
+                if (!isTableExists(keyValueTableName, connection)) {
+                    try (PreparedStatement ps = connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))")) {
+                        ps.executeUpdate();
+                    }
+                } else {
+                    throw e;
                 }
             }
         }
@@ -1519,14 +1526,9 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public Object get(String key) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
-            }
-            
-            if (!isTableExists(keyValueTableName, connection)) {
-                throw new SQLHelperException("Key Value Table with name '" + keyValueTableName + "' not found.");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            //ResultSet rs = select(singleValueTable, "*", "WHERE sqlhelper_key = ?", new Object[]{key.toUpperCase()});
             try (PreparedStatement ps = connection.prepareStatement("SELECT sqlhelper_value FROM " + keyValueTableName + " WHERE sqlhelper_key = ?")) {
                 ps.setString(1, key);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -1534,7 +1536,13 @@ public class SQLHelper implements AutoCloseable {
                         Object obj = rs.getObject("sqlhelper_value");
                         return obj;
                     } else {
-                        throw new SQLHelperException("No Value found for key '" + key + "'");
+                        throw new SQLHelperException("Unknown key '" + key + "'.");
+                    }
+                } catch (Throwable e) {
+                    if (!isTableExists(keyValueTableName, connection)) {
+                        throw new SQLHelperException("Key Value Table with name '" + keyValueTableName + "' not found.");
+                    } else {
+                        throw e;
                     }
                 }
             }
@@ -1543,9 +1551,9 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public <T> T get(String key, Class<T> resultType) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             if (!isTableExists(keyValueTableName, connection)) {
                 throw new SQLHelperException("Key Value Table with name '" + keyValueTableName + "' not found.");
             }
@@ -1568,7 +1576,7 @@ public class SQLHelper implements AutoCloseable {
                             }
                         }
                     } else {
-                        throw new SQLHelperException("No Value found for key '" + key + "'");
+                        throw new SQLHelperException("Unknown key '" + key + "'.");
                     }
                 }
             }
@@ -1578,9 +1586,9 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public boolean containsKey(String key) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             if (!isTableExists(keyValueTableName, connection)) {
                 return false;
             }
@@ -1600,9 +1608,9 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public String containsValue(Object value) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             if (!isTableExists(keyValueTableName, connection)) {
                 return null;
             }
@@ -1636,9 +1644,9 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public Object remove(String key) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             if (isTableExists(keyValueTableName, connection)) {
                 Object value = null;
                 if (containsKey(key)) {
@@ -1657,9 +1665,9 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public void clear() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             if (isTableExists(keyValueTableName, connection)) {
                 try (PreparedStatement ps = connection.prepareStatement("DELETE FROM " + keyValueTableName)) {
                     ps.executeUpdate();
@@ -1672,9 +1680,9 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public int size() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             if (isTableExists(keyValueTableName, connection)) {
                 try (PreparedStatement ps = connection.prepareStatement("SELECT COUNT(sqlhelper_key) FROM " + keyValueTableName)) {
                     return ps.executeQuery().getInt(1);
@@ -1687,9 +1695,9 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public Object replace(String key, Object newValue) throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             if (isTableExists(keyValueTableName, connection)) {
                 Object value = null;
                 if (containsKey(key)) {
@@ -1705,19 +1713,39 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public Map<String, Object> getMap() throws Exception {
             if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException(" No operations allowed after connection closed");
+                throw new SQLHelperException("No operations allowed after connection closed");
             }
-            
+
             Map<String, Object> keyValueMap = new HashMap();
             try (PreparedStatement ps = connection.prepareStatement("SELECT sqlhelper_key,sqlhelper_value FROM " + keyValueTableName)) {
                 try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
+                    while (rs.next()) {
                         Object obj = rs.getObject(2);
                         keyValueMap.put(rs.getString(1), obj);
                     }
                 }
             }
             return keyValueMap;
+        }
+
+        @Override
+        public void putMap(Map<String, Object> map) throws Exception {
+            if (connection == null || connection.isClosed()) {
+                throw new SQLHelperException("No operations allowed after connection closed");
+            }
+
+            connection.setAutoCommit(false);
+
+            Iterator<String> keysIterator = map.keySet().iterator();
+
+            while (keysIterator.hasNext()) {
+                String key = keysIterator.next();
+                put(key, map.get(key));
+            }
+
+            connection.commit();
+
+            connection.setAutoCommit(true);
         }
     }
 
@@ -1755,7 +1783,7 @@ public class SQLHelper implements AutoCloseable {
 
         @Override
         public void close() throws Exception {
-            if (connection == null || connection.isClosed()) {
+            if (connection == null || !connection.isClosed()) {
                 connection.close();
             }
         }
