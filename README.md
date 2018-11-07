@@ -92,9 +92,8 @@ try(SQLHelper sql = new SQLHelper(... databse url ...)){
     
 }
 ```
-
-`setValues(SQLHelperValue object)` method is designed because most of values when retrieved from databse is stored in objects, so it's more convenient to insert an object and make the class get the values from it rather than getting the values one by one,
-here are the steps to make it work:
+### Preparing class to be used with SQLHelper:
+`setValues(SQLHelperValue object)` method is designed because most of values when retrieved from databse is stored in objects, so it's more convenient to insert an object and make the class get the values from it rather than getting the values one by one, **this works with [update](https://github.com/SalehHaddawi/SQLHelper/blob/master/README.md#update) also**, here are the steps to make it work:
 
 1. have a class implements SQLHelperValue interface.
 2. implements `getSQLHelperValue` method in the class.
