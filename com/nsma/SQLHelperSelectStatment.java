@@ -9,10 +9,12 @@ import java.util.List;
  */
 public interface SQLHelperSelectStatment {
 
-    public SQLHelperSelectStatment setCondition(String condition, Object... values);
+    public SQLHelperSelectStatment where(String condition, Object... values);
+    
+    public SQLHelperSelectStatment having(String condition, Object... values);
     
     public SQLHelperSelectStatment setCols(String columns);
-    
+        
     public SQLHelperSelectStatment distinct(boolean selectDistinct);
     
     public SQLHelperSelectStatment limit(int rows);

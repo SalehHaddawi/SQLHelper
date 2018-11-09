@@ -29,4 +29,6 @@ public interface KeyValueTable {
     public int size() throws Exception;
 
     public Map<String,Object> getMap() throws Exception;
+    
+    public void putMap(Map<String,Object> map) throws Exception;
 }

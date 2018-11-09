@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Savepoint;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,6 +17,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.StringTokenizer;
 
 /**
  *
@@ -37,8 +39,6 @@ public class SQLHelper implements AutoCloseable {
     private String DB_URL = "";
 
     private DatabaseType currentConnectionDatabaseType = globalDatabaseType;
-
-    private String keyValueTableName = "sqlhelper_key_value_table";
 
     private TransactionManager transactionManager;
 
@@ -222,6 +222,9 @@ public class SQLHelper implements AutoCloseable {
     @Override
     public void close() throws Exception {
         if (connection != null && !connection.isClosed()) {
+            if (!connection.getAutoCommit()) {
+                connection.rollback();
+            }
             connection.close();
         }
     }
@@ -365,7 +368,7 @@ public class SQLHelper implements AutoCloseable {
         return _res;
     }
 
-    public static void getTablesAndColumns(String url, String databaseName, Connection connection) throws Exception {
+    private static void getTablesAndColumns(String url, String databaseName, Connection connection) throws Exception {
         DatabaseMetaData databaseMetaData = connection.getMetaData();
 
         try (ResultSet columns = databaseMetaData.getTables(databaseName, null, "%", new String[]{"TABLE"})) {
@@ -412,9 +415,9 @@ public class SQLHelper implements AutoCloseable {
 
         String table;
         String columns = null;
+
         Object[] valuesArray = null;
         SQLHelperValue valueNew = null;
-
         Map<String, Object> valuesMap = null;
 
         Connection connection;
@@ -436,6 +439,7 @@ public class SQLHelper implements AutoCloseable {
 
             valuesMap = null;
             valueNew = null;
+
             return this;
         }
 
@@ -472,66 +476,15 @@ public class SQLHelper implements AutoCloseable {
             valuesArray = null;
             valuesMap = null;
             valueNew = null;
+
             return this;
         }
 
         @Override
         public SQLHelperStatmentMetaData getMetaData() {
-            return new SQLHelperStatmentMetaData() {
-                @Override
-                public String getSQLString() throws Exception {
-                    String cols = "";
-                    if (valuesArray == null && valueNew == null && valuesMap != null) {
-                        StringBuilder columnBuilder = new StringBuilder(valuesMap.size() * 6);
-                        //cols = new String[valuesMap.size()];
-                        Iterator<String> iterator = valuesMap.keySet().iterator();
-                        while (iterator.hasNext()) {
-                            String next = iterator.next();
-                            columnBuilder.append(iterator.hasNext() ? next + "," : next);
-                            //cols[i++] = next;
-                        }
-                        cols = columnBuilder.toString();
-                    } else {
-                        if ((columns == null || columns.trim().isEmpty())) {
-                            cols = SQLHelper.getColumns(table, connection);
-                        } else {
-                            cols = columns;
-                        }
-                    }
-                    int size = cols.split(",").length;
-
-                    StringBuilder sql = new StringBuilder(50);
-
-                    sql.append("INSERT INTO ").append(table).append("(").append(cols).append(") VALUES (").append(Q_Marks(size)).append(")");
-
-                    return sql.toString();
-                }
-
-                @Override
-                public Object[] getValues() {
-                    throw new UnsupportedOperationException("Not supported yet.");
-                }
-
-                @Override
-                public Object[] getConditionValues() {
-                    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-                }
-
-                @Override
-                public String getConditioString() {
-                    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-                }
-
-                @Override
-                public String getColumns() {
-                    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-                }
-
-                @Override
-                public int getParametersCount() throws Exception {
-                    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-                }
-            };
+            SQLHelperStatmentMetaDataImplementation metaData = new SQLHelperStatmentMetaDataImplementation();
+            updateMetaData(metaData);
+            return metaData;
         }
 
         @Override
@@ -541,8 +494,79 @@ public class SQLHelper implements AutoCloseable {
             }
 
             int res = 0;
-            String[] cols = null;
+            int size = 0;
+            List<String> cols = null;
 
+            if (valuesArray == null && valueNew == null && valuesMap != null) {
+                StringBuilder columnBuilder = new StringBuilder(valuesMap.size() * 6);
+                cols = new ArrayList<>(valuesMap.size());
+                Iterator<String> iterator = valuesMap.keySet().iterator();
+                while (iterator.hasNext()) {
+                    String next = iterator.next();
+                    columnBuilder.append(iterator.hasNext() ? next + "," : next);
+                    cols.add(next);
+                    size++;
+                }
+                columns = columnBuilder.toString();
+            } else {
+                if ((columns == null || columns.trim().isEmpty())) {
+                    columns = getColumns(table, connection);
+                }
+                cols = new ArrayList<>();
+                StringTokenizer st = new StringTokenizer(columns, ",", true);
+                while (st.hasMoreElements()) {
+                    String next = st.nextToken();
+                    if (!next.equals(",")) {
+                        cols.add(next);
+                    } else {
+                        size++;
+                    }
+                }
+                size++;
+            }
+            
+            StringBuilder sql = new StringBuilder(50);
+
+            sql.append("INSERT INTO ").append(table).append("(").append(columns).append(") VALUES (").append(Q_Marks(size)).append(")");
+            
+            try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+
+                int varags = ps.getParameterMetaData().getParameterCount();
+
+                int i = 0;
+                if (valuesArray != null) {
+                    for (; i < varags && i < valuesArray.length ; i++) {
+                        setValuesForPreparedStatment(ps, this.valuesArray[i], i + 1);
+                    }
+                }
+                if (valuesMap != null) {
+                    for (; i < varags && i < valuesMap.size(); i++) {
+                        setValuesForPreparedStatment(ps, valuesMap.get(cols.get(i)), i + 1);
+                    }
+                }
+                if (valueNew != null) {
+                    for (; i < varags && i < size; i++) {
+                        valueNew.getSQLHelperValue(cols.get(i).toLowerCase(), i + 1, ps);
+                    }
+                }
+
+                if (i < varags) {
+                    throw new SQLHelperException("SQL INSERT statement requires (" + varags + ") values but found (" + i + ") values, for columns: (" + columns + ")");
+                }
+
+                reset();
+                res = ps.executeUpdate();
+            }
+
+            return res;
+        }
+
+        private void updateMetaData(SQLHelperStatmentMetaDataImplementation meta) {
+            if (meta == null) {
+                return;
+            }
+
+            String[] cols;
             if (valuesArray == null && valueNew == null && valuesMap != null) {
                 StringBuilder columnBuilder = new StringBuilder(valuesMap.size() * 6);
                 cols = new String[valuesMap.size()];
@@ -556,47 +580,53 @@ public class SQLHelper implements AutoCloseable {
                 columns = columnBuilder.toString();
             } else {
                 if ((columns == null || columns.trim().isEmpty())) {
-                    columns = getColumns(table, connection);
+                    try {
+                        columns = getColumns(table, connection);
+                    } catch (Exception ex) {
+                        columns = null;
+                    }
                 }
-                cols = columns.split(",");
+                cols = columns == null ? null : columns.split(",");
             }
-
-            int size = cols.length;
 
             StringBuilder sql = new StringBuilder(50);
 
-            sql.append("INSERT INTO ").append(table).append("(").append(columns).append(") VALUES (").append(Q_Marks(size)).append(")");
+            int size = 0;
 
-            try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+            if (cols != null) {
+                size = cols.length;
 
-                int varags = ps.getParameterMetaData().getParameterCount();
+                sql.append("INSERT INTO ").append(table).append("(").append(columns).append(") VALUES (").append(Q_Marks(size)).append(")");
 
-                int i = 0;
-                if (valuesArray != null) {
-                    for (; i < varags && i < valuesArray.length && i < cols.length; i++) {
-                        setValuesForPreparedStatment(ps, this.valuesArray[i], i + 1);
-                    }
-                }
-                if (valuesMap != null) {
-                    for (; i < varags && i < valuesMap.size() && i < cols.length; i++) {
-                        setValuesForPreparedStatment(ps, valuesMap.get(cols[i]), i + 1);
-                    }
-                }
-                if (valueNew != null) {
-                    for (; i < varags && i < cols.length; i++) {
-                        valueNew.getSQLHelperValue(cols[i].toLowerCase(), i + 1, ps);
-                    }
-                }
-
-                if (i < varags) {
-                    throw new SQLHelperException("SQL INSERT statement requires (" + varags + ") values but found (" + i + ") values, for columns: (" + columns + ")");
-                }
-
-                reset();
-                res = ps.executeUpdate();
+                meta.objects[0] = sql.toString();
+                meta.objects[1] = columns;
+            } else {
+                meta.objects[0] = null;
+                meta.objects[1] = null;
             }
 
-            return res;
+            meta.objects[2] = null;
+            meta.objects[3] = null;
+
+            meta.objects[4] = table;
+            meta.objects[6] = getValues(columns);
+            meta.objects[7] = null;
+            meta.objects[8] = size;
+        }
+
+        private Object[] getValues(String columns) {
+            Object[] result = null;
+            if (valuesArray != null) {
+                result = valuesArray;
+            } else if (valuesMap != null) {
+                result = new Object[valuesMap.size()];
+                String[] cols = columns.split(",");
+                for (int i = 0; i < result.length; i++) {
+                    result[i] = valuesMap.get(cols[i]);
+                }
+            }
+
+            return result;
         }
     }
 
@@ -622,6 +652,7 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public SQLHelperUpdateStatment setCols(String columns) {
             this.columns = columns;
+
             return this;
         }
 
@@ -630,11 +661,13 @@ public class SQLHelper implements AutoCloseable {
             this.valuesArray = values;
             valuesMap = null;
             valueNew = null;
+
             return this;
         }
 
         @Override
         public SQLHelperUpdateStatment setValues(SQLHelperValue valueObject) {
+            valueNew = valueObject;
 
             return this;
         }
@@ -653,13 +686,16 @@ public class SQLHelper implements AutoCloseable {
 
             valuesArray = null;
             valueNew = null;
+
             return this;
         }
 
         @Override
-        public SQLHelperUpdateStatment setCondition(String condition, Object... values) {
-            this.condition = condition;
-            this.conditionValues = values;
+        public SQLHelperUpdateStatment where(String condition, Object... values) {
+            if (condition != null && !condition.trim().isEmpty()) {
+                this.condition = "WHERE " + condition;
+                this.conditionValues = values;
+            }
             return this;
         }
 
@@ -671,7 +707,16 @@ public class SQLHelper implements AutoCloseable {
             conditionValues = null;
             valuesMap = null;
             valueNew = null;
+
             return this;
+        }
+
+        @Override
+        public SQLHelperStatmentMetaData getMetaData() {
+            SQLHelperStatmentMetaDataImplementation metaData = new SQLHelperStatmentMetaDataImplementation();
+            updateMetaData(metaData);
+
+            return metaData;
         }
 
         @Override
@@ -681,80 +726,154 @@ public class SQLHelper implements AutoCloseable {
             }
 
             int res = 0;
-            String[] cols = null;
+            int size = 0;
+            List<String> cols = null;
 
             if (valuesArray == null && valueNew == null && valuesMap != null) {
                 StringBuilder columnBuilder = new StringBuilder(valuesMap.size() * 6);
-                cols = new String[valuesMap.size()];
+                cols = new ArrayList<>(valuesMap.size());
                 Iterator<String> iterator = valuesMap.keySet().iterator();
-                int i = 0;
                 while (iterator.hasNext()) {
                     String next = iterator.next();
                     columnBuilder.append(iterator.hasNext() ? next + "," : next);
-                    cols[i++] = next;
+                    cols.add(next);
+                    size++;
                 }
                 columns = columnBuilder.toString();
             } else {
                 if ((columns == null || columns.trim().isEmpty())) {
                     columns = getColumns(table, connection);
                 }
-                cols = columns.split(",");
+                cols = new ArrayList<>();
+                StringTokenizer st = new StringTokenizer(columns, ",", true);
+                while (st.hasMoreElements()) {
+                    String next = st.nextToken();
+                    if (!next.equals(",")) {
+                        cols.add(next);
+                    } else {
+                        size++;
+                    }
+                }
+                size++;
             }
-
-            int size = cols.length;
-
+            
             StringBuilder sql = new StringBuilder(50);
 
-            sql.append("UPDATE ").append(table).append(" SET ").append(Q_Marks(size, columns)).append(" ").append(condition == null ? "" : condition);
-
+            sql.append("INSERT INTO ").append(table).append("(").append(columns).append(") VALUES (").append(Q_Marks(size)).append(")");
+            
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int varags = ps.getParameterMetaData().getParameterCount();
+                int argsCount = ps.getParameterMetaData().getParameterCount();
 
                 int i = 0;
-
                 if (valuesArray != null) {
-                    for (; i < varags && i < valuesArray.length && i < cols.length; i++) {
+                    for (; i < argsCount && i < valuesArray.length ; i++) {
                         setValuesForPreparedStatment(ps, this.valuesArray[i], i + 1);
                     }
                 }
                 if (valuesMap != null) {
-                    for (; i < varags && i < valuesMap.size() && i < cols.length; i++) {
-                        setValuesForPreparedStatment(ps, valuesMap.get(cols[i]), i + 1);
+                    for (; i < argsCount && i < valuesMap.size(); i++) {
+                        setValuesForPreparedStatment(ps, valuesMap.get(cols.get(i)), i + 1);
                     }
                 }
                 if (valueNew != null) {
-                    for (; i < varags && i < cols.length; i++) {
-                        valueNew.getSQLHelperValue(cols[i].toLowerCase(), i + 1, ps);
+                    for (; i < argsCount && i < size; i++) {
+                        valueNew.getSQLHelperValue(cols.get(i).toLowerCase(), i + 1, ps);
                     }
                 }
 
-                if (conditionValues != null) {
-                    for (int j = 0; i < varags && j < conditionValues.length; i++, j++) {
-                        setValuesForPreparedStatment(ps, this.conditionValues[j], i + 1);
-                    }
-                }
-
-                if (i < varags) {
-                    throw new SQLHelperException("SQL UPDATE statement requires (" + varags + ") values but found (" + i + ") values, for columns: (" + columns + ")");
+                if (i < argsCount) {
+                    throw new SQLHelperException("SQL UPDATE statement requires (" + argsCount + ") values but found (" + i + ") values, for columns: (" + columns + ")");
                 }
                 reset();
 
                 res = ps.executeUpdate();
             }
+            
+            //sql.append("UPDATE ").append(table).append(" SET ").append(Q_Marks(size, columns)).append(" ").append(condition == null ? "" : condition);
 
             return res;
         }
 
         @Override
-        public long executeLarge() throws Exception {
-            if (connection == null || connection.isClosed()) {
+        public long executeLarge() throws Exception {if (connection == null || connection.isClosed()) {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
             long res = 0;
-            String[] cols = null;
+            int size = 0;
+            List<String> cols = null;
 
+            if (valuesArray == null && valueNew == null && valuesMap != null) {
+                StringBuilder columnBuilder = new StringBuilder(valuesMap.size() * 6);
+                cols = new ArrayList<>(valuesMap.size());
+                Iterator<String> iterator = valuesMap.keySet().iterator();
+                while (iterator.hasNext()) {
+                    String next = iterator.next();
+                    columnBuilder.append(iterator.hasNext() ? next + "," : next);
+                    cols.add(next);
+                    size++;
+                }
+                columns = columnBuilder.toString();
+            } else {
+                if ((columns == null || columns.trim().isEmpty())) {
+                    columns = getColumns(table, connection);
+                }
+                cols = new ArrayList<>();
+                StringTokenizer st = new StringTokenizer(columns, ",", true);
+                while (st.hasMoreElements()) {
+                    String next = st.nextToken();
+                    if (!next.equals(",")) {
+                        cols.add(next);
+                    } else {
+                        size++;
+                    }
+                }
+                size++;
+            }
+            
+            StringBuilder sql = new StringBuilder(50);
+
+            sql.append("INSERT INTO ").append(table).append("(").append(columns).append(") VALUES (").append(Q_Marks(size)).append(")");
+            
+            try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+
+                int argsCount = ps.getParameterMetaData().getParameterCount();
+
+                int i = 0;
+                if (valuesArray != null) {
+                    for (; i < argsCount && i < valuesArray.length ; i++) {
+                        setValuesForPreparedStatment(ps, this.valuesArray[i], i + 1);
+                    }
+                }
+                if (valuesMap != null) {
+                    for (; i < argsCount && i < valuesMap.size(); i++) {
+                        setValuesForPreparedStatment(ps, valuesMap.get(cols.get(i)), i + 1);
+                    }
+                }
+                if (valueNew != null) {
+                    for (; i < argsCount && i < size; i++) {
+                        valueNew.getSQLHelperValue(cols.get(i).toLowerCase(), i + 1, ps);
+                    }
+                }
+
+                if (i < argsCount) {
+                    throw new SQLHelperException("SQL UPDATE statement requires (" + argsCount + ") values but found (" + i + ") values, for columns: (" + columns + ")");
+                }
+                reset();
+
+                res = ps.executeLargeUpdate();
+            }
+            
+            return res;
+        }
+
+        private void updateMetaData(SQLHelperStatmentMetaDataImplementation meta) {
+            if (meta == null) {
+                return;
+            }
+
+            String[] cols;
             if (valuesArray == null && valueNew == null && valuesMap != null) {
                 StringBuilder columnBuilder = new StringBuilder(valuesMap.size() * 6);
                 cols = new String[valuesMap.size()];
@@ -768,56 +887,66 @@ public class SQLHelper implements AutoCloseable {
                 columns = columnBuilder.toString();
             } else {
                 if ((columns == null || columns.trim().isEmpty())) {
-                    columns = getColumns(table, connection);
+                    try {
+                        columns = getColumns(table, connection);
+                    } catch (Exception ex) {
+                        columns = null;
+                    }
                 }
-                cols = columns.split(",");
+                cols = columns == null ? null : columns.split(",");
             }
-
-            int size = cols.length;
 
             StringBuilder sql = new StringBuilder(50);
 
-            sql.append("UPDATE ").append(table).append(" SET ").append(Q_Marks(size, columns)).append(" ").append(condition == null ? "" : condition);
+            int size = 0;
 
-            System.out.println(sql);
+            if (cols != null) {
+                size = cols.length;
 
-            try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
+                sql.append("UPDATE ").append(table).append(" SET ").append(Q_Marks(size, columns)).append(" ").append(condition == null ? "" : condition);
 
-                int varags = ps.getParameterMetaData().getParameterCount();
-
-                int i = 0;
-
-                if (valuesArray != null) {
-                    for (; i < varags && i < valuesArray.length && i < cols.length; i++) {
-                        setValuesForPreparedStatment(ps, this.valuesArray[i], i + 1);
-                    }
-                }
-                if (valuesMap != null) {
-                    for (; i < varags && i < valuesMap.size() && i < cols.length; i++) {
-                        setValuesForPreparedStatment(ps, valuesMap.get(cols[i]), i + 1);
-                    }
-                }
-                if (valueNew != null) {
-                    for (; i < varags && i < cols.length; i++) {
-                        valueNew.getSQLHelperValue(cols[i].toLowerCase(), i + 1, ps);
-                    }
-                }
-
-                if (conditionValues != null) {
-                    for (int j = 0; i < varags && j < conditionValues.length; i++, j++) {
-                        setValuesForPreparedStatment(ps, this.conditionValues[j], i + 1);
-                    }
-                }
-
-                if (i < varags) {
-                    throw new SQLHelperException("SQL UPDATE statement requires (" + varags + ") values but found (" + i + ") values, for columns: (" + columns + ")");
-                }
-                reset();
-
-                res = ps.executeLargeUpdate();
+                meta.objects[0] = sql.toString();
+                meta.objects[1] = columns;
+            } else {
+                meta.objects[0] = null;
+                meta.objects[1] = null;
             }
 
-            return res;
+            meta.objects[2] = condition;
+            meta.objects[3] = null;
+
+            meta.objects[4] = table;
+
+            meta.objects[5] = getValues(columns);
+            meta.objects[6] = conditionValues;
+            meta.objects[7] = null;
+
+            meta.objects[8] = getReqValuesCount(sql.toString());
+        }
+
+        private Object[] getValues(String columns) {
+            Object[] result = null;
+            if (valuesArray != null) {
+                result = valuesArray;
+            } else if (valuesMap != null) {
+                result = new Object[valuesMap.size()];
+                String[] cols = columns.split(",");
+                for (int i = 0; i < result.length; i++) {
+                    result[i] = valuesMap.get(cols[i]);
+                }
+            }
+
+            return result;
+        }
+
+        private int getReqValuesCount(String sql) {
+            int result = 0;
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                result = ps.getParameterMetaData().getParameterCount();
+            } catch (Throwable t) {
+                result = -1;
+            }
+            return result;
         }
     }
 
@@ -835,10 +964,11 @@ public class SQLHelper implements AutoCloseable {
         }
 
         @Override
-        public SQLHelperDeleteStatment setCondition(String condition, Object... values) {
-            this.condition = condition;
-            this.conditionValues = values;
-
+        public SQLHelperDeleteStatment where(String condition, Object... values) {
+            if (condition != null && !condition.trim().isEmpty()) {
+                this.condition = "WHERE " + condition;
+                this.conditionValues = values;
+            }
             return this;
         }
 
@@ -846,7 +976,15 @@ public class SQLHelper implements AutoCloseable {
         public SQLHelperDeleteStatment reset() {
             condition = null;
             conditionValues = null;
+
             return this;
+        }
+
+        @Override
+        public SQLHelperStatmentMetaData getMetaData() {
+            SQLHelperStatmentMetaDataImplementation metaData = new SQLHelperStatmentMetaDataImplementation();
+            updateMetaData(metaData);
+            return metaData;
         }
 
         @Override
@@ -863,10 +1001,10 @@ public class SQLHelper implements AutoCloseable {
 
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int varags = ps.getParameterMetaData().getParameterCount();
+                int argsCount = ps.getParameterMetaData().getParameterCount();
 
-                if (this.conditionValues != null && this.conditionValues.length < varags) {
-                    throw new SQLHelperException("SQL DELETE statement requires (" + varags + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
+                if (this.conditionValues != null && this.conditionValues.length < argsCount) {
+                    throw new SQLHelperException("SQL DELETE statement requires (" + argsCount + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
                 }
 
                 if (conditionValues != null) {
@@ -896,10 +1034,10 @@ public class SQLHelper implements AutoCloseable {
 
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int varags = ps.getParameterMetaData().getParameterCount();
+                int argsCount = ps.getParameterMetaData().getParameterCount();
 
-                if (this.conditionValues != null && this.conditionValues.length < varags) {
-                    throw new SQLHelperException("SQL DELETE statement requires (" + varags + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
+                if (this.conditionValues != null && this.conditionValues.length < argsCount) {
+                    throw new SQLHelperException("SQL DELETE statement requires (" + argsCount + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
                 }
 
                 if (conditionValues != null) {
@@ -915,14 +1053,48 @@ public class SQLHelper implements AutoCloseable {
             return res;
         }
 
+        private void updateMetaData(SQLHelperStatmentMetaDataImplementation meta) {
+            if (meta == null) {
+                return;
+            }
+
+            StringBuilder sql = new StringBuilder(50);
+
+            sql.append("DELETE FROM ").append(table).append(" ").append(condition == null ? "" : condition);
+
+            meta.objects[0] = sql.toString();
+            meta.objects[1] = null;
+
+            meta.objects[2] = condition;
+            meta.objects[3] = null;
+
+            meta.objects[4] = table;
+
+            meta.objects[5] = null;
+            meta.objects[6] = conditionValues;
+            meta.objects[7] = null;
+
+            meta.objects[8] = getReqValuesCount(sql.toString());
+        }
+
+        private int getReqValuesCount(String sql) {
+            int result = 0;
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                result = ps.getParameterMetaData().getParameterCount();
+            } catch (Throwable t) {
+
+            }
+            return result;
+        }
     }
 
     private static class SQLHelperSelectStatmentImplementation implements SQLHelperSelectStatment {
 
         String table = null;
         String columns = null;
-        String condition = null;
+        String whereCondition = null;
         String groupBy = null;
+        String having = null;
         String orderBY = null;
 
         boolean selectDistinct;
@@ -932,6 +1104,8 @@ public class SQLHelper implements AutoCloseable {
         int limitRows = 0;
 
         Object[] conditionValues = null;
+
+        Object[] havingValues = null;
 
         boolean canDriverCastObjectToSpecificType = true;
 
@@ -952,10 +1126,19 @@ public class SQLHelper implements AutoCloseable {
         }
 
         @Override
-        public SQLHelperSelectStatment setCondition(String condition, Object... values) {
+        public SQLHelperSelectStatment where(String condition, Object... values) {
             if (condition != null && !condition.trim().isEmpty()) {
-                this.condition = condition;
+                this.whereCondition = condition.toUpperCase().trim().startsWith("WHERE") ? condition : "WHERE " + condition;
                 this.conditionValues = values;
+            }
+            return this;
+        }
+
+        @Override
+        public SQLHelperSelectStatment having(String condition, Object... values) {
+            if (condition != null && !condition.trim().isEmpty()) {
+                this.having = condition.toUpperCase().trim().startsWith("HAVING") ? condition : "HAVING " + condition;
+                this.havingValues = values;
             }
             return this;
         }
@@ -990,13 +1173,14 @@ public class SQLHelper implements AutoCloseable {
 
         @Override
         public SQLHelperSelectStatment reset() {
-            condition = null;
+            whereCondition = null;
             conditionValues = null;
             limitRows = 0;
             distinct(false);
             columns = null;
             orderBY = null;
             groupBy = null;
+            having = null;
 
             return this;
         }
@@ -1014,18 +1198,18 @@ public class SQLHelper implements AutoCloseable {
             }
             double res = Double.NaN;
             StringBuilder sql = new StringBuilder(50);
-            sql.append("SELECT ").append("MAX(").append(selectDistinct ? "DISTINCT " : "").append(column).append(") FROM ").append(table).append(" ").append(condition == null ? "" : condition);
+            sql.append("SELECT ").append("MAX(").append(selectDistinct ? "DISTINCT " : "").append(column).append(") FROM ").append(table).append(" ").append(whereCondition == null ? "" : whereCondition);
 
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int varags = ps.getParameterMetaData().getParameterCount();
+                int argsCount = ps.getParameterMetaData().getParameterCount();
 
-                if (this.conditionValues != null && this.conditionValues.length < varags) {
-                    throw new SQLHelperException("SQL MAX() function in SELECT requires (" + varags + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
+                if (this.conditionValues != null && this.conditionValues.length < argsCount) {
+                    throw new SQLHelperException("SQL MAX() function in SELECT requires (" + argsCount + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
                 }
 
                 if (conditionValues != null) {
-                    for (int i = 0; i < conditionValues.length && i < varags; i++) {
+                    for (int i = 0; i < conditionValues.length && i < argsCount; i++) {
                         setValuesForPreparedStatment(ps, conditionValues[i], i + 1);
                     }
                 }
@@ -1061,18 +1245,18 @@ public class SQLHelper implements AutoCloseable {
             double res = Double.NaN;
 
             StringBuilder sql = new StringBuilder(50);
-            sql.append("SELECT ").append("MIN(").append(selectDistinct ? "DISTINCT " : "").append(column).append(") FROM ").append(table).append(" ").append(condition == null ? "" : condition);
+            sql.append("SELECT ").append("MIN(").append(selectDistinct ? "DISTINCT " : "").append(column).append(") FROM ").append(table).append(" ").append(whereCondition == null ? "" : whereCondition);
 
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int varags = ps.getParameterMetaData().getParameterCount();
+                int argsCount = ps.getParameterMetaData().getParameterCount();
 
-                if (this.conditionValues != null && this.conditionValues.length < varags) {
-                    throw new SQLHelperException("SQL MIN() function in SELECT requires (" + varags + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
+                if (this.conditionValues != null && this.conditionValues.length < argsCount) {
+                    throw new SQLHelperException("SQL MIN() function in SELECT requires (" + argsCount + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
                 }
 
                 if (conditionValues != null) {
-                    for (int i = 0; i < conditionValues.length && i < varags; i++) {
+                    for (int i = 0; i < conditionValues.length && i < argsCount; i++) {
                         setValuesForPreparedStatment(ps, conditionValues[i], i + 1);
                     }
                 }
@@ -1108,18 +1292,18 @@ public class SQLHelper implements AutoCloseable {
             double res = Double.NaN;
 
             StringBuilder sql = new StringBuilder(50);
-            sql.append("SELECT ").append("SUM(").append(selectDistinct ? "DISTINCT " : "").append(column).append(") FROM ").append(table).append(" ").append(condition == null ? "" : condition);
+            sql.append("SELECT ").append("SUM(").append(selectDistinct ? "DISTINCT " : "").append(column).append(") FROM ").append(table).append(" ").append(whereCondition == null ? "" : whereCondition);
 
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int varags = ps.getParameterMetaData().getParameterCount();
+                int argsCount = ps.getParameterMetaData().getParameterCount();
 
-                if (this.conditionValues != null && this.conditionValues.length < varags) {
-                    throw new SQLHelperException("SQL SUM() function in SELECT requires (" + varags + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
+                if (this.conditionValues != null && this.conditionValues.length < argsCount) {
+                    throw new SQLHelperException("SQL SUM() function in SELECT requires (" + argsCount + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
                 }
 
                 if (conditionValues != null) {
-                    for (int i = 0; i < conditionValues.length && i < varags; i++) {
+                    for (int i = 0; i < conditionValues.length && i < argsCount; i++) {
                         setValuesForPreparedStatment(ps, conditionValues[i], i + 1);
                     }
                 }
@@ -1156,18 +1340,18 @@ public class SQLHelper implements AutoCloseable {
             double res = Double.NaN;
 
             StringBuilder sql = new StringBuilder(50);
-            sql.append("SELECT ").append("AVG(").append(selectDistinct ? "DISTINCT " : "").append(column).append(") FROM ").append(table).append(" ").append(condition == null ? "" : condition);
+            sql.append("SELECT ").append("AVG(").append(selectDistinct ? "DISTINCT " : "").append(column).append(") FROM ").append(table).append(" ").append(whereCondition == null ? "" : whereCondition);
 
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int varags = ps.getParameterMetaData().getParameterCount();
+                int argsCount = ps.getParameterMetaData().getParameterCount();
 
-                if (this.conditionValues != null && this.conditionValues.length < varags) {
-                    throw new SQLHelperException("SQL AVG() function in SELECT requires (" + varags + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
+                if (this.conditionValues != null && this.conditionValues.length < argsCount) {
+                    throw new SQLHelperException("SQL AVG() function in SELECT requires (" + argsCount + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
                 }
 
                 if (conditionValues != null) {
-                    for (int i = 0; i < conditionValues.length && i < varags; i++) {
+                    for (int i = 0; i < conditionValues.length && i < argsCount; i++) {
                         setValuesForPreparedStatment(ps, conditionValues[i], i + 1);
                     }
                 }
@@ -1207,17 +1391,17 @@ public class SQLHelper implements AutoCloseable {
             long res = 0;
 
             StringBuilder sql = new StringBuilder(50);
-            sql.append("SELECT (").append("COUNT(").append(selectDistinct ? "DISTINCT " : "").append(column).append(")").append(") FROM ").append(table).append(" ").append(condition == null ? "" : condition);
+            sql.append("SELECT (").append("COUNT(").append(selectDistinct ? "DISTINCT " : "").append(column).append(")").append(") FROM ").append(table).append(" ").append(whereCondition == null ? "" : whereCondition);
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int varags = ps.getParameterMetaData().getParameterCount();
+                int argsCount = ps.getParameterMetaData().getParameterCount();
 
-                if (this.conditionValues != null && this.conditionValues.length < varags) {
-                    throw new SQLHelperException("SQL COUNT() function in SELECT requires (" + varags + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
+                if (this.conditionValues != null && this.conditionValues.length < argsCount) {
+                    throw new SQLHelperException("SQL COUNT() function in SELECT requires (" + argsCount + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
                 }
 
                 if (conditionValues != null) {
-                    for (int i = 0; i < conditionValues.length && i < varags; i++) {
+                    for (int i = 0; i < conditionValues.length && i < argsCount; i++) {
                         setValuesForPreparedStatment(ps, conditionValues[i], i + 1);
                     }
                 }
@@ -1246,8 +1430,8 @@ public class SQLHelper implements AutoCloseable {
             }
 
             sql.append("SELECT ").append(limitRows > 0 && (databaseType == DatabaseType.MSACCESS) ? "TOP " + limitRows + " " : "")
-                    .append(this.selectDistinct ? "DISTINCT " : "").append(columns == null ? "*" : columns).append(" FROM ").append(table).append(" ").append(condition == null ? "" : condition)
-                    .append(groupBy == null ? "" : " GROUP BY ").append(groupBy == null ? "" : groupBy + " ").append(orderBY == null ? "" : " ORDER BY ").append(orderBY == null ? "" : orderBY + " ")
+                    .append(this.selectDistinct ? "DISTINCT " : "").append(columns == null ? "*" : columns).append(" FROM ").append(table).append(" ").append(whereCondition == null ? "" : whereCondition)
+                    .append(groupBy == null ? "" : " GROUP BY ").append(groupBy == null ? "" : groupBy + " ").append(having == null ? "" : having).append(orderBY == null ? "" : " ORDER BY ").append(orderBY == null ? "" : orderBY + " ")
                     .append(limitRows > 0 && (databaseType == DatabaseType.MYSQL || databaseType == DatabaseType.SQLITE || databaseType == DatabaseType.OTHER) ? " LIMIT " + limitRows + " " : "");
 
             if (limitRows > 0 && databaseType == DatabaseType.ORACLE) {
@@ -1256,14 +1440,14 @@ public class SQLHelper implements AutoCloseable {
 
             PreparedStatement ps = connection.prepareStatement(sql.toString());
 
-            int varags = ps.getParameterMetaData().getParameterCount();
+            int argsCount = ps.getParameterMetaData().getParameterCount();
 
-            if (this.conditionValues != null && this.conditionValues.length < varags) {
-                throw new SQLHelperException("SQL SELECT statement requires (" + varags + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
+            if (this.conditionValues != null && this.conditionValues.length < argsCount) {
+                throw new SQLHelperException("SQL SELECT statement requires (" + argsCount + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
             }
 
             if (conditionValues != null) {
-                for (int i = 0; i < conditionValues.length && i < varags; i++) {
+                for (int i = 0; i < conditionValues.length && i < argsCount; i++) {
                     setValuesForPreparedStatment(ps, conditionValues[i], i + 1);
                 }
             }
@@ -1287,7 +1471,7 @@ public class SQLHelper implements AutoCloseable {
             }
 
             sql.append("SELECT ").append(limitRows > 0 && (databaseType == DatabaseType.MSACCESS) ? "TOP " + limitRows + " " : "")
-                    .append(this.selectDistinct ? "DISTINCT " : "").append(columns == null ? "*" : columns).append(" FROM ").append(table).append(" ").append(condition == null ? "" : condition)
+                    .append(this.selectDistinct ? "DISTINCT " : "").append(columns == null ? "*" : columns).append(" FROM ").append(table).append(" ").append(whereCondition == null ? "" : whereCondition)
                     .append(groupBy == null ? "" : " GROUP BY ").append(groupBy == null ? "" : groupBy + " ").append(orderBY == null ? "" : " ORDER BY ").append(orderBY == null ? "" : orderBY + " ")
                     .append(limitRows > 0 && (databaseType == DatabaseType.MYSQL || databaseType == DatabaseType.SQLITE || databaseType == DatabaseType.OTHER) ? " LIMIT " + limitRows + " " : "");
 
@@ -1297,10 +1481,10 @@ public class SQLHelper implements AutoCloseable {
 
             PreparedStatement ps = connection.prepareStatement(sql.toString());
 
-            int varags = ps.getParameterMetaData().getParameterCount();
+            int argsCount = ps.getParameterMetaData().getParameterCount();
 
-            if (this.conditionValues != null && this.conditionValues.length < varags) {
-                throw new SQLHelperException("SQL SELECT statement requires (" + varags + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
+            if (this.conditionValues != null && this.conditionValues.length < argsCount) {
+                throw new SQLHelperException("SQL SELECT statement requires (" + argsCount + ") values but found (" + (this.conditionValues == null ? 0 : this.conditionValues.length) + ") values.");
             }
 
             if (conditionValues != null) {
@@ -1334,6 +1518,69 @@ public class SQLHelper implements AutoCloseable {
             ps.close();
 
             return resultList;
+        }
+    }
+
+    private static class SQLHelperStatmentMetaDataImplementation implements SQLHelperStatmentMetaData {
+
+        // 0 -> SQLString
+        // 1 -> columns
+        // 2 -> whereString
+        // 3 -> havingString
+        // 4 -> table
+        // 5 -> values
+        // 6 -> where values
+        // 7 -> having values
+        // 8 -> required values count
+        public Object[] objects = new Object[9];
+
+        public SQLHelperStatmentMetaDataImplementation() {
+            objects[8] = 0;
+        }
+
+        @Override
+        public String getSQLString() throws Exception {
+            return (String) objects[0];
+        }
+
+        @Override
+        public String getColumns() throws Exception {
+            return (String) objects[1];
+        }
+
+        @Override
+        public String getWhereString() {
+            return (String) objects[2];
+        }
+
+        @Override
+        public String getHavingString() {
+            return (String) objects[3];
+        }
+
+        @Override
+        public String getTable() {
+            return (String) objects[4];
+        }
+
+        @Override
+        public Object[] getValues() {
+            return (Object[]) objects[5];
+        }
+
+        @Override
+        public Object[] getWhereValues() {
+            return (Object[]) objects[6];
+        }
+
+        @Override
+        public Object[] getHavingValues() {
+            return (Object[]) objects[7];
+        }
+
+        @Override
+        public int getRequiredValuesCount() throws Exception {
+            return (int) objects[8];
         }
     }
 
@@ -1398,11 +1645,102 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            try (PreparedStatement ps = connection.prepareStatement("SELECT 1 FROM " + table)) {
+            try {
+                try (PreparedStatement ps = connection.prepareStatement("SELECT 1 FROM " + table)) {
+                    ResultSet rs = ps.executeQuery();
+                    rs.close();
+                }
                 return true;
             } catch (Throwable e) {
                 return false;
             }
+        }
+
+        @Override
+        public void addColumn(String table, String columnWithType) throws Exception {
+            try (PreparedStatement ps = connection.prepareStatement("ALTER TABLE " + table + " ADD " + columnWithType)) {
+                ps.executeUpdate();
+            }
+        }
+
+        @Override
+        public void dropColumn(String table, String column) throws Exception {
+            String columns = SQLHelper.getColumns(table, connection);
+            if (!columns.toLowerCase().contains(column.toLowerCase())) {
+                System.err.println("COLUMN NOT FOUND");
+                return;
+            }
+            try (PreparedStatement ps = connection.prepareStatement("ALTER TABLE " + table + " DROP COLUMN " + column)) {
+                ps.executeUpdate();
+            } catch (Throwable t) {
+                System.err.println("SSSSSSSS" + t);
+
+                String[] cols = columns.split(",");
+                String[] colsWithoutColumn = new String[cols.length - 1];
+                String[] types = new String[colsWithoutColumn.length];
+                int index = 0;
+
+                for (String col : cols) {
+                    if (!col.equalsIgnoreCase(column)) {
+                        colsWithoutColumn[index++] = col;
+                    }
+                }
+
+                try {
+                    try (PreparedStatement ps = connection.prepareStatement("SELECT * FROM " + table)) {
+                        for (int i = 0; i < colsWithoutColumn.length; i++) {
+                            types[i] = ps.getMetaData().getColumnTypeName(i + 1) + "(" + ps.getMetaData().getColumnDisplaySize(i + 1) + ")";
+                        }
+                    }
+
+                    StringBuilder sql = new StringBuilder((colsWithoutColumn.length * 6) * 5);
+                    StringBuilder sqlColumns = new StringBuilder(colsWithoutColumn.length * 6);
+                    for (int i = 0; i < colsWithoutColumn.length; i++) {
+                        if (i == colsWithoutColumn.length - 1) {
+                            sql.append(colsWithoutColumn[i]).append(" ").append(types[i]);
+                            sqlColumns.append(colsWithoutColumn[i]);
+                        } else {
+                            sql.append(colsWithoutColumn[i]).append(" ").append(types[i]).append(",");
+                            sqlColumns.append(colsWithoutColumn[i]).append(",");
+                        }
+                    }
+
+                    try (PreparedStatement ps = connection.prepareStatement("ALTER TABLE " + table + " RENAME TO " + table + "_sqlhelper_old")) {
+                        ps.executeUpdate();
+                    }
+
+                    createTable(table, sql.toString());
+
+                    System.out.println("INSERT INTO " + table + " (" + sqlColumns + ")" + " SELECT " + sqlColumns + " FROM " + table + "_sqlhelper_old");
+
+                    try (PreparedStatement ps = connection.prepareStatement("INSERT INTO " + table + " (" + sqlColumns + ")" + " SELECT " + sqlColumns + " FROM " + table + "_sqlhelper_old")) {
+                        ps.executeUpdate();
+                    }
+                    try (PreparedStatement ps = connection.prepareStatement("DROP TABLE " + table + "_sqlhelper_old")) {
+                        ps.executeUpdate();
+                    }
+                } catch (Throwable e) {
+                    try {
+                        if (isTableExists(table + "_sqlhelper_old")) {
+                            dropTableIfExists(table);
+                            try (PreparedStatement ps = connection.prepareStatement("ALTER TABLE " + table + "_sqlhelper_old" + " RENAME TO " + table)) {
+                                ps.executeUpdate();
+                            }
+                        }
+
+                        try (PreparedStatement ps = connection.prepareStatement("SELECT * INTO " + table + "_sqlhelper_old" + " FROM " + table)) {
+                            ps.close();
+                        }
+                    } catch (Throwable e1) {
+                        throw new SQLFeatureNotSupportedException("drop column is not supported.");
+                    }
+                }
+            }
+        }
+
+        @Override
+        public String getColumns(String table) throws Exception {
+            return SQLHelper.getColumns(table, connection);
         }
     }
 
@@ -1420,14 +1758,20 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            connection.setAutoCommit(false);
-            connection.setSavepoint();
+            if (connection.getAutoCommit()) {
+                connection.setAutoCommit(false);
+                connection.setSavepoint();
+            }
         }
 
         @Override
         public void commit() throws Exception {
             if (connection == null || connection.isClosed()) {
                 throw new SQLHelperException("No operations allowed after connection closed");
+            }
+
+            if (connection.getAutoCommit()) {
+                throw new SQLHelperException("Can't commit while no transaction is going.");
             }
 
             connection.commit();
@@ -1440,8 +1784,25 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
+            if (connection.getAutoCommit()) {
+                throw new SQLHelperException("Can't rollback while no transaction is going.");
+            }
+
             connection.rollback();
             connection.setAutoCommit(true);
+        }
+
+        @Override
+        public void rollback(Savepoint savepoint) throws Exception {
+            if (connection == null || connection.isClosed()) {
+                throw new SQLHelperException("No operations allowed after connection closed");
+            }
+
+            if (connection.getAutoCommit()) {
+                throw new SQLHelperException("Can't rollback while no transaction is going.");
+            }
+
+            connection.rollback(savepoint);
         }
 
         @Override
@@ -1459,18 +1820,12 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            return connection.setSavepoint();
-        }
-
-        @Override
-        public void rollback(Savepoint savepoint) throws Exception {
-            if (connection == null || connection.isClosed()) {
-                throw new SQLHelperException("No operations allowed after connection closed");
+            if (connection.getAutoCommit()) {
+                throw new SQLHelperException("Can't create save point while no transaction is going.");
             }
 
-            connection.rollback(savepoint);
+            return connection.setSavepoint();
         }
-
     }
 
     private static class KeyValueTableImplementation implements KeyValueTable {
@@ -1517,6 +1872,9 @@ public class SQLHelper implements AutoCloseable {
                     try (PreparedStatement ps = connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))")) {
                         ps.executeUpdate();
                     }
+
+                    put(key, value);
+
                 } else {
                     throw e;
                 }
@@ -1538,12 +1896,15 @@ public class SQLHelper implements AutoCloseable {
                     } else {
                         throw new SQLHelperException("Unknown key '" + key + "'.");
                     }
-                } catch (Throwable e) {
-                    if (!isTableExists(keyValueTableName, connection)) {
-                        throw new SQLHelperException("Key Value Table with name '" + keyValueTableName + "' not found.");
-                    } else {
-                        throw e;
+                }
+            } catch (Throwable e) {
+                if (!isTableExists(keyValueTableName, connection)) {
+                    try (PreparedStatement ps1 = connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))")) {
+                        ps1.executeUpdate();
                     }
+                    throw new SQLHelperException("Unknown key '" + key + "'.");
+                } else {
+                    throw e;
                 }
             }
         }
@@ -1554,9 +1915,6 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            if (!isTableExists(keyValueTableName, connection)) {
-                throw new SQLHelperException("Key Value Table with name '" + keyValueTableName + "' not found.");
-            }
             T obj = null;
             try (PreparedStatement ps = connection.prepareStatement("SELECT sqlhelper_value FROM " + keyValueTableName + " WHERE sqlhelper_key = ?")) {
                 ps.setString(1, key);
@@ -1579,6 +1937,15 @@ public class SQLHelper implements AutoCloseable {
                         throw new SQLHelperException("Unknown key '" + key + "'.");
                     }
                 }
+            } catch (Throwable t) {
+                if (!isTableExists(keyValueTableName, connection)) {
+                    try (PreparedStatement ps1 = connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))")) {
+                        ps1.executeUpdate();
+                    }
+                    throw new SQLHelperException("Unknown key '" + key + "'.");
+                } else {
+                    throw t;
+                }
             }
             return obj;
         }
@@ -1589,17 +1956,21 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            if (!isTableExists(keyValueTableName, connection)) {
-                return false;
-            }
-
-            //return op().select(keyValueTableName).setCondition("WHERE sqlhelper_key = ?", key).count("*") != 0;
             try (PreparedStatement ps = connection.prepareStatement("SELECT COUNT(sqlhelper_key) FROM " + keyValueTableName + " WHERE sqlhelper_key = ?")) {
                 ps.setString(1, key);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         return rs.getInt(1) > 0;
                     }
+                }
+            } catch (Throwable t) {
+                if (!isTableExists(keyValueTableName, connection)) {
+                    try (PreparedStatement ps1 = connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))")) {
+                        ps1.executeUpdate();
+                    }
+                    return false;
+                } else {
+                    throw t;
                 }
             }
             return false;
@@ -1609,10 +1980,6 @@ public class SQLHelper implements AutoCloseable {
         public String containsValue(Object value) throws Exception {
             if (connection == null || connection.isClosed()) {
                 throw new SQLHelperException("No operations allowed after connection closed");
-            }
-
-            if (!isTableExists(keyValueTableName, connection)) {
-                return null;
             }
 
             String res = null;
@@ -1637,6 +2004,15 @@ public class SQLHelper implements AutoCloseable {
                         }
                     }
                 }
+            } catch (Throwable t) {
+                if (!isTableExists(keyValueTableName, connection)) {
+                    try (PreparedStatement ps1 = connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))")) {
+                        ps1.executeUpdate();
+                    }
+                    return null;
+                } else {
+                    throw t;
+                }
             }
             return res;
         }
@@ -1647,19 +2023,15 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            if (isTableExists(keyValueTableName, connection)) {
-                Object value = null;
-                if (containsKey(key)) {
-                    value = get(key);
-                    try (PreparedStatement ps = connection.prepareStatement("DELETE FROM " + keyValueTableName + " WHERE sqlhelper_key = ?")) {
-                        ps.setString(1, key);
-                        ps.executeUpdate();
-                    }
+            Object value = null;
+            if (containsKey(key)) {
+                value = get(key);
+                try (PreparedStatement ps = connection.prepareStatement("DELETE FROM " + keyValueTableName + " WHERE sqlhelper_key = ?")) {
+                    ps.setString(1, key);
+                    ps.executeUpdate();
                 }
-                return value;
-            } else {
-                throw new SQLHelperException("Key Value Table with name '" + keyValueTableName + "' not found.");
             }
+            return value;
         }
 
         @Override
@@ -1668,12 +2040,16 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            if (isTableExists(keyValueTableName, connection)) {
-                try (PreparedStatement ps = connection.prepareStatement("DELETE FROM " + keyValueTableName)) {
-                    ps.executeUpdate();
+            try (PreparedStatement ps = connection.prepareStatement("DELETE FROM " + keyValueTableName)) {
+                ps.executeUpdate();
+            } catch (Throwable t) {
+                if (!isTableExists(keyValueTableName, connection)) {
+                    try (PreparedStatement ps1 = connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))")) {
+                        ps1.executeUpdate();
+                    }
+                } else {
+                    throw t;
                 }
-            } else {
-                throw new SQLHelperException("Key Value Table with name '" + keyValueTableName + "' not found.");
             }
         }
 
@@ -1683,13 +2059,23 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            if (isTableExists(keyValueTableName, connection)) {
-                try (PreparedStatement ps = connection.prepareStatement("SELECT COUNT(sqlhelper_key) FROM " + keyValueTableName)) {
-                    return ps.executeQuery().getInt(1);
+            try (PreparedStatement ps = connection.prepareStatement("SELECT COUNT(sqlhelper_key) FROM " + keyValueTableName)) {
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
                 }
-            } else {
-                throw new SQLHelperException("Key Value Table with name '" + keyValueTableName + "' not found.");
+            } catch (Throwable t) {
+                if (!isTableExists(keyValueTableName, connection)) {
+                    try (PreparedStatement ps1 = connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))")) {
+                        ps1.executeUpdate();
+                    }
+                } else {
+                    throw t;
+                }
             }
+
+            return 0;
         }
 
         @Override
@@ -1698,16 +2084,12 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            if (isTableExists(keyValueTableName, connection)) {
-                Object value = null;
-                if (containsKey(key)) {
-                    value = get(key);
-                    put(key, newValue);
-                }
-                return value;
-            } else {
-                throw new SQLHelperException("Key Value Table with name '" + keyValueTableName + "' not found.");
+            Object value = null;
+            if (containsKey(key)) {
+                value = get(key);
+                put(key, newValue);
             }
+            return value;
         }
 
         @Override
@@ -1724,6 +2106,14 @@ public class SQLHelper implements AutoCloseable {
                         keyValueMap.put(rs.getString(1), obj);
                     }
                 }
+            } catch (Throwable t) {
+                if (!isTableExists(keyValueTableName, connection)) {
+                    try (PreparedStatement ps1 = connection.prepareStatement("CREATE TABLE " + keyValueTableName + " (sqlhelper_key VARCHAR(1024),sqlhelper_value VARCHAR(1024))")) {
+                        ps1.executeUpdate();
+                    }
+                } else {
+                    throw t;
+                }
             }
             return keyValueMap;
         }
@@ -1734,18 +2124,12 @@ public class SQLHelper implements AutoCloseable {
                 throw new SQLHelperException("No operations allowed after connection closed");
             }
 
-            connection.setAutoCommit(false);
-
             Iterator<String> keysIterator = map.keySet().iterator();
 
             while (keysIterator.hasNext()) {
                 String key = keysIterator.next();
                 put(key, map.get(key));
             }
-
-            connection.commit();
-
-            connection.setAutoCommit(true);
         }
     }
 
@@ -1801,7 +2185,7 @@ public class SQLHelper implements AutoCloseable {
         }
 
         @Override
-        public SQLHelperInsertStatment insert(String tableName) throws Exception {
+        public SQLHelperInsertStatment insertInto(String tableName) throws Exception {
             if (tableName == null) {
                 throw new NullPointerException("table name is null.");
             } else if (tableName.trim().isEmpty()) {
@@ -1821,7 +2205,7 @@ public class SQLHelper implements AutoCloseable {
         }
 
         @Override
-        public SQLHelperDeleteStatment delete(String tableName) throws Exception {
+        public SQLHelperDeleteStatment deleteFrom(String tableName) throws Exception {
             if (tableName == null) {
                 throw new NullPointerException("table name is null.");
             } else if (tableName.trim().isEmpty()) {
@@ -1831,7 +2215,7 @@ public class SQLHelper implements AutoCloseable {
         }
 
         @Override
-        public SQLHelperSelectStatment select(String tableName) throws Exception {
+        public SQLHelperSelectStatment selectFrom(String tableName) throws Exception {
             if (tableName == null) {
                 throw new NullPointerException("table name is null.");
             } else if (tableName.trim().isEmpty()) {
@@ -1842,7 +2226,7 @@ public class SQLHelper implements AutoCloseable {
 
     }
 
-    // -------------------------------------------- EXCEPTION -------------------------------------------------------- \\
+// -------------------------------------------- EXCEPTION -------------------------------------------------------- \\
     /**
      * An exception that provides information on SQLHelper error, not necessary
      * a database error.

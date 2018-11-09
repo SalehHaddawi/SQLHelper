@@ -6,9 +6,11 @@ package com.nsma;
  */
 public interface SQLHelperDeleteStatment {
 
-    public SQLHelperDeleteStatment setCondition(String condition, Object... values);
-    
+    public SQLHelperDeleteStatment where(String condition, Object... values);
+
     public SQLHelperDeleteStatment reset();
+
+    public SQLHelperStatmentMetaData getMetaData();
 
     public int execute() throws Exception;
 

@@ -8,13 +8,19 @@ public interface SQLHelperStatmentMetaData {
 
     public String getSQLString() throws Exception;
 
-    public Object[] getValues();
-    
-    public Object[] getConditionValues();
-    
-    public String getConditioString();
-    
+    public String getWhereString();
+
+    public String getHavingString();
+
     public String getColumns() throws Exception;
     
-    public int getParametersCount() throws Exception;
+    public String getTable();
+
+    public Object[] getValues();
+
+    public Object[] getWhereValues();
+
+    public Object[] getHavingValues();
+
+    public int getRequiredValuesCount() throws Exception;
 }
