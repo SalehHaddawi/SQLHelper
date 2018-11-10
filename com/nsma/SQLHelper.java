@@ -429,7 +429,9 @@ public class SQLHelper implements AutoCloseable {
 
         @Override
         public SQLHelperInsertStatment setCols(String columns) {
-            this.columns = columns;
+            if (columns != null && !columns.trim().isEmpty()) {
+                this.columns = columns;
+            }
             return this;
         }
 
@@ -481,7 +483,7 @@ public class SQLHelper implements AutoCloseable {
         }
 
         @Override
-        public SQLHelperStatmentMetaData getMetaData() {
+        public SQLHelperStatmentMetaData getMetaData() throws Exception {
             SQLHelperStatmentMetaDataImplementation metaData = new SQLHelperStatmentMetaDataImplementation();
             updateMetaData(metaData);
             return metaData;
@@ -524,18 +526,18 @@ public class SQLHelper implements AutoCloseable {
                 }
                 size++;
             }
-            
+
             StringBuilder sql = new StringBuilder(50);
 
             sql.append("INSERT INTO ").append(table).append("(").append(columns).append(") VALUES (").append(Q_Marks(size)).append(")");
-            
+
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
                 int varags = ps.getParameterMetaData().getParameterCount();
 
                 int i = 0;
                 if (valuesArray != null) {
-                    for (; i < varags && i < valuesArray.length ; i++) {
+                    for (; i < varags && i < valuesArray.length; i++) {
                         setValuesForPreparedStatment(ps, this.valuesArray[i], i + 1);
                     }
                 }
@@ -561,45 +563,51 @@ public class SQLHelper implements AutoCloseable {
             return res;
         }
 
-        private void updateMetaData(SQLHelperStatmentMetaDataImplementation meta) {
+        private void updateMetaData(SQLHelperStatmentMetaDataImplementation meta) throws Exception {
             if (meta == null) {
                 return;
             }
 
-            String[] cols;
+            int size = 0;
+            //List<String> cols = null;
+            String _columns = null;
+
             if (valuesArray == null && valueNew == null && valuesMap != null) {
                 StringBuilder columnBuilder = new StringBuilder(valuesMap.size() * 6);
-                cols = new String[valuesMap.size()];
+                //cols = new ArrayList<>(valuesMap.size());
                 Iterator<String> iterator = valuesMap.keySet().iterator();
-                int i = 0;
                 while (iterator.hasNext()) {
                     String next = iterator.next();
                     columnBuilder.append(iterator.hasNext() ? next + "," : next);
-                    cols[i++] = next;
+                    //cols.add(next);
+                    size++;
                 }
-                columns = columnBuilder.toString();
+                _columns = columnBuilder.toString();
             } else {
-                if ((columns == null || columns.trim().isEmpty())) {
-                    try {
-                        columns = getColumns(table, connection);
-                    } catch (Exception ex) {
-                        columns = null;
+                if ((_columns == null || _columns.trim().isEmpty())) {
+                    _columns = getColumns(table, connection);
+                }
+                //cols = new ArrayList<>();
+                StringTokenizer st = new StringTokenizer(_columns, ",", true);
+                while (st.hasMoreElements()) {
+                    String next = st.nextToken();
+                    if (!next.equals(",")) {
+                        //cols.add(next);
+                    } else {
+                        size++;
                     }
                 }
-                cols = columns == null ? null : columns.split(",");
+                size++;
             }
 
             StringBuilder sql = new StringBuilder(50);
 
-            int size = 0;
+            if (size >= 1) {
 
-            if (cols != null) {
-                size = cols.length;
-
-                sql.append("INSERT INTO ").append(table).append("(").append(columns).append(") VALUES (").append(Q_Marks(size)).append(")");
+                sql.append("INSERT INTO ").append(table).append("(").append(_columns).append(") VALUES (").append(Q_Marks(size)).append(")");
 
                 meta.objects[0] = sql.toString();
-                meta.objects[1] = columns;
+                meta.objects[1] = _columns;
             } else {
                 meta.objects[0] = null;
                 meta.objects[1] = null;
@@ -609,7 +617,8 @@ public class SQLHelper implements AutoCloseable {
             meta.objects[3] = null;
 
             meta.objects[4] = table;
-            meta.objects[6] = getValues(columns);
+            meta.objects[5] = getValues(_columns);
+            meta.objects[6] = null;
             meta.objects[7] = null;
             meta.objects[8] = size;
         }
@@ -617,15 +626,20 @@ public class SQLHelper implements AutoCloseable {
         private Object[] getValues(String columns) {
             Object[] result = null;
             if (valuesArray != null) {
-                result = valuesArray;
+                result = new Object[valuesArray.length];
+                System.arraycopy(valuesArray, 0, result, 0, valuesArray.length);
             } else if (valuesMap != null) {
                 result = new Object[valuesMap.size()];
-                String[] cols = columns.split(",");
-                for (int i = 0; i < result.length; i++) {
-                    result[i] = valuesMap.get(cols[i]);
+                int index = 0;
+                StringTokenizer st = new StringTokenizer(columns, ",", true);
+                while (st.hasMoreElements()) {
+                    String next = st.nextToken();
+                    if (!next.equals(",")) {
+                        //cols.add(next);
+                        result[index++] = valuesMap.get(next);
+                    }
                 }
             }
-
             return result;
         }
     }
@@ -756,42 +770,46 @@ public class SQLHelper implements AutoCloseable {
                 }
                 size++;
             }
-            
+
             StringBuilder sql = new StringBuilder(50);
 
-            sql.append("INSERT INTO ").append(table).append("(").append(columns).append(") VALUES (").append(Q_Marks(size)).append(")");
-            
+            sql.append("UPDATE ").append(table).append(" SET ").append(Q_Marks(size, columns)).append(" ").append(condition == null ? "" : condition);
+
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int argsCount = ps.getParameterMetaData().getParameterCount();
+                int varags = ps.getParameterMetaData().getParameterCount();
 
                 int i = 0;
+
                 if (valuesArray != null) {
-                    for (; i < argsCount && i < valuesArray.length ; i++) {
+                    for (; i < varags && i < valuesArray.length && i < size; i++) {
                         setValuesForPreparedStatment(ps, this.valuesArray[i], i + 1);
                     }
                 }
                 if (valuesMap != null) {
-                    for (; i < argsCount && i < valuesMap.size(); i++) {
+                    for (; i < varags && i < valuesMap.size() && i < size; i++) {
                         setValuesForPreparedStatment(ps, valuesMap.get(cols.get(i)), i + 1);
                     }
                 }
                 if (valueNew != null) {
-                    for (; i < argsCount && i < size; i++) {
+                    for (; i < varags && i < size; i++) {
                         valueNew.getSQLHelperValue(cols.get(i).toLowerCase(), i + 1, ps);
                     }
                 }
 
-                if (i < argsCount) {
-                    throw new SQLHelperException("SQL UPDATE statement requires (" + argsCount + ") values but found (" + i + ") values, for columns: (" + columns + ")");
+                if (conditionValues != null) {
+                    for (int j = 0; i < varags && j < conditionValues.length; i++, j++) {
+                        setValuesForPreparedStatment(ps, this.conditionValues[j], i + 1);
+                    }
+                }
+
+                if (i < varags) {
+                    throw new SQLHelperException("SQL UPDATE statement requires (" + varags + ") values but found (" + i + ") values, for columns: (" + columns + ")");
                 }
                 reset();
 
                 res = ps.executeUpdate();
             }
-            
-            //sql.append("UPDATE ").append(table).append(" SET ").append(Q_Marks(size, columns)).append(" ").append(condition == null ? "" : condition);
-
             return res;
         }
 
@@ -831,40 +849,46 @@ public class SQLHelper implements AutoCloseable {
                 }
                 size++;
             }
-            
+
             StringBuilder sql = new StringBuilder(50);
 
-            sql.append("INSERT INTO ").append(table).append("(").append(columns).append(") VALUES (").append(Q_Marks(size)).append(")");
-            
+            sql.append("UPDATE ").append(table).append(" SET ").append(Q_Marks(size, columns)).append(" ").append(condition == null ? "" : condition);
+
             try (PreparedStatement ps = connection.prepareStatement(sql.toString())) {
 
-                int argsCount = ps.getParameterMetaData().getParameterCount();
+                int varags = ps.getParameterMetaData().getParameterCount();
 
                 int i = 0;
+
                 if (valuesArray != null) {
-                    for (; i < argsCount && i < valuesArray.length ; i++) {
+                    for (; i < varags && i < valuesArray.length && i < size; i++) {
                         setValuesForPreparedStatment(ps, this.valuesArray[i], i + 1);
                     }
                 }
                 if (valuesMap != null) {
-                    for (; i < argsCount && i < valuesMap.size(); i++) {
+                    for (; i < varags && i < valuesMap.size() && i < size; i++) {
                         setValuesForPreparedStatment(ps, valuesMap.get(cols.get(i)), i + 1);
                     }
                 }
                 if (valueNew != null) {
-                    for (; i < argsCount && i < size; i++) {
+                    for (; i < varags && i < size; i++) {
                         valueNew.getSQLHelperValue(cols.get(i).toLowerCase(), i + 1, ps);
                     }
                 }
 
-                if (i < argsCount) {
-                    throw new SQLHelperException("SQL UPDATE statement requires (" + argsCount + ") values but found (" + i + ") values, for columns: (" + columns + ")");
+                if (conditionValues != null) {
+                    for (int j = 0; i < varags && j < conditionValues.length; i++, j++) {
+                        setValuesForPreparedStatment(ps, this.conditionValues[j], i + 1);
+                    }
+                }
+
+                if (i < varags) {
+                    throw new SQLHelperException("SQL UPDATE statement requires (" + varags + ") values but found (" + i + ") values, for columns: (" + columns + ")");
                 }
                 reset();
 
                 res = ps.executeLargeUpdate();
             }
-            
             return res;
         }
 
@@ -924,18 +948,22 @@ public class SQLHelper implements AutoCloseable {
             meta.objects[8] = getReqValuesCount(sql.toString());
         }
 
-        private Object[] getValues(String columns) {
-            Object[] result = null;
+        private Object[] getValues(String columns) {Object[] result = null;
             if (valuesArray != null) {
-                result = valuesArray;
+                result = new Object[valuesArray.length];
+                System.arraycopy(valuesArray, 0, result, 0, valuesArray.length);
             } else if (valuesMap != null) {
                 result = new Object[valuesMap.size()];
-                String[] cols = columns.split(",");
-                for (int i = 0; i < result.length; i++) {
-                    result[i] = valuesMap.get(cols[i]);
+                int index = 0;
+                StringTokenizer st = new StringTokenizer(columns, ",", true);
+                while (st.hasMoreElements()) {
+                    String next = st.nextToken();
+                    if (!next.equals(",")) {
+                        //cols.add(next);
+                        result[index++] = valuesMap.get(next);
+                    }
                 }
             }
-
             return result;
         }
 
@@ -1581,6 +1609,15 @@ public class SQLHelper implements AutoCloseable {
         @Override
         public int getRequiredValuesCount() throws Exception {
             return (int) objects[8];
+        }
+
+        @Override
+        public Object[] getAllObjects() throws Exception {
+            Object[] _objects = new Object[objects.length];
+
+            System.arraycopy(objects, 0, _objects, 0, objects.length);
+
+            return _objects;
         }
     }
 
